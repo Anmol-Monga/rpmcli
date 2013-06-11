@@ -133,6 +133,21 @@ class RPM(object):
     'user-remove': {'uid': 'user-id'},
     'user-reset': {'uids': 'user-ids'}
   }
+  addkwargs = {'action-add',
+               'action-modify',
+               'device-add',
+               'device-modify',
+               'job-add',
+               'job-find',
+               'job-modify',
+               'port-modify',
+               'queue-find',
+               'queue-modify',
+               'socket-modify-listener',
+               'transform-add',
+               'transform-modify',
+               'user-modify'}
+
   def __init__(self, host = 'localhost', port = 9198):
     self.conn = RPCConnection(host, port)
     self.auth()
@@ -155,10 +170,10 @@ class RPM(object):
           params = {rpcname: kwargs[argname]
                       for argname, rpcname in self.methodspec[cmd].items()
                         if argname in kwargs}
+          if cmd in self.addkwargs:
+            params.update(kwargs)
           return self.command(cmd, **params)
-        argstr = '\n'.join(
-                   ': '.join(pair) for pair in sorted(self.methodspec[cmd].items())
-                 )
+        argstr = '\n'.join(map(': '.join, sorted(self.methodspec[cmd].items())))
         f.__doc__ = "Method: %s\n -- Valid Keywords --\n%s" % (cmd, argstr)
       else:
         def f(self, cmd = cmd):
