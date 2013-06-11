@@ -30,6 +30,7 @@ class RPCConnection(object, Telnet):
     self._disconnect()
 
   def send(self, adict):
+    print json.dumps(adict)
     self.write(json.dumps(adict))
 
   def recv(self):
