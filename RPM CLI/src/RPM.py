@@ -32,6 +32,7 @@ class RPM(object):
     'action-remove-all': {'qid': 'queue-id', 'qname': 'queue-name'},
     'action-set-devmode': {'aid': 'action-id', 'devmode': 'devmode'},
     'action-set-type': {'atype': 'action-type', 'aid': 'action-id'},
+    'app-status': {'option': 'option'},
     'callback-add': {'callback': 'callback'},
     'callback-call': {'tag': 'callback-tag'},
     'callback-remove': {'callback': 'callback'},
@@ -155,9 +156,14 @@ class RPM(object):
                       for argname, rpcname in self.methodspec[cmd].items()
                         if argname in kwargs}
           return self.command(cmd, **params)
+        argstr = '\n'.join(
+                   ': '.join(pair) for pair in sorted(self.methodspec[cmd].items())
+                 )
+        f.__doc__ = "Method: %s\n -- Valid Keywords --\n%s" % (cmd, argstr)
       else:
         def f(self, cmd = cmd):
           return self.command(cmd)
+        f.__doc__ = "Method: %s\n -- No Additional Keywords --" % cmd
       f.__name__ = str(method)
       # hyphens aren't valid in python syntax, but they're 
       # accessible via getattr if necessary.
