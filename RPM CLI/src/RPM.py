@@ -60,6 +60,7 @@ class RPM(object):
     'job-clear-error': {'jid': 'job-id'},
     'job-copy': {'jid': 'job-id'},
     'job-file-str': {'jid': 'job-id', 'mask': 'string'},
+    'job-find': {'name': 'name'},
     'job-get': {'jid': 'job-id'},
     'job-get-error': {'jid': 'job-id'},
     'job-get-path': {'jid': 'job-id'},
@@ -80,6 +81,7 @@ class RPM(object):
     'queue-eligible': {'qid': 'queue-id', 'qname': 'queue-name'},
     'queue-enable': {'qid': 'queue-id', 'state': 'enable'},
     'queue-exists': {'qid': 'queue-id', 'qname': 'queue-name'},
+    'queue-find': {'name': 'name'},
     'queue-get': {'qid': 'queue-id', 'qname': 'queue-name'},
     'queue-hold': {'qid': 'queue-id', 'state': 'hold'},
     'queue-id': {'qname': 'queue-name'},
@@ -166,7 +168,7 @@ class RPM(object):
       if hasattr(self, method):
         continue
       if cmd in self.methodspec:
-        def f(self, cmd = cmd, **kwargs):
+        def func(self, cmd = cmd, **kwargs):
           params = {rpcname: kwargs[argname]
                       for argname, rpcname in self.methodspec[cmd].items()
                         if argname in kwargs}
@@ -174,16 +176,18 @@ class RPM(object):
             params.update(kwargs)
           return self.command(cmd, **params)
         argstr = '\n'.join(map(': '.join, sorted(self.methodspec[cmd].items())))
-        f.__doc__ = "Method: %s\n -- Valid Keywords --\n%s" % (cmd, argstr)
+        if cmd in self.addkwargs:
+          argstr += '\n**kwargs: Additional unlisted parameters allowed.'
+        func.__doc__ = "Method: %s\n -- Valid Keywords --\n%s" % (cmd, argstr)
       else:
-        def f(self, cmd = cmd):
+        def func(self, cmd = cmd):
           return self.command(cmd)
-        f.__doc__ = "Method: %s\n -- No Additional Keywords --" % cmd
-      f.__name__ = str(method)
+        func.__doc__ = "Method: %s\n -- No Additional Keywords --" % cmd
+      func.__name__ = str(method)
       # hyphens aren't valid in python syntax, but they're 
       # accessible via getattr if necessary.
-      setattr(RPM, cmd, f)
-      setattr(RPM, method, f)
+      setattr(RPM, cmd, func)
+      setattr(RPM, method, func)
 
   def app_key(self):
     return self.command('app-key', key = self.rpckey)
