@@ -153,14 +153,17 @@ class RPM(object):
   def __init__(self, host = 'localhost', port = 9198):
     self.conn = RPCConnection(host, port)
     self.auth()
+    self.loadcmds()
 
   def auth(self):
     with closing(shelve.open('constants')) as store:
       self.rpckey = store.get('rpckey', '')
-      if not self.rpckey:
+      while True:
+        authorized = self.app_key()
+        if authorized['success']:
+          return authorized
+        print authorized['message']
         store['rpckey'] = self.rpckey = raw_input('Please enter your RPC Key: ')
-    self.app_key()
-    self.loadcmds()
 
   def loadcmds(self):
     for cmd in self.command('list-all-rpc')['commands']:
