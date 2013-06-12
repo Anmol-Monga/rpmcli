@@ -151,13 +151,15 @@ class RPM(object):
                'user-modify'}
 
   def __init__(self, host = 'localhost', port = 9198):
+    self.host = host
+    self.port = port
     self.conn = RPCConnection(host, port)
     self.auth()
     self.loadcmds()
 
   def auth(self):
     with closing(shelve.open('constants')) as store:
-      self.rpckey = store.get('rpckey', '')
+      self.rpckey = store.get('%s-%d-%s' % (self.host, self.port, 'rpckey'), '')
       while True:
         authorized = self.app_key()
         if authorized['success']:
