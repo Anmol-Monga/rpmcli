@@ -159,13 +159,14 @@ class RPM(object):
 
   def auth(self):
     with closing(shelve.open('constants')) as store:
-      self.rpckey = store.get('%s-%d-%s' % (self.host, self.port, 'rpckey'), '')
+      mykeystr = '%s-%d-%s' % (self.host, self.port, 'rpckey')
+      self.rpckey = store.get(mykeystr, '')
       while True:
         authorized = self.app_key()
         if authorized['success']:
           return authorized
         print authorized['message']
-        store['rpckey'] = self.rpckey = raw_input('Please enter your RPC Key: ')
+        store[mykeystr] = self.rpckey = raw_input('Please enter your RPC Key: ')
 
   def loadcmds(self):
     for cmd in self.command('list-all-rpc')['commands']:
