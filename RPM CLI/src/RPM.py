@@ -168,27 +168,33 @@ class RPM(object):
         print authorized['message']
         store[mykeystr] = self.rpckey = raw_input('Please enter your RPC Key: ')
 
+  def _gen(self, cmd):
+    def func(self):
+      return self.command(cmd)
+    func.__doc__ = "Method: %s\n -- No Additional Keywords --" % cmd
+    return func
+
+  def _genkwargs(self, cmd):
+    def func(self, **kwargs):
+      params = {rpcname: kwargs[argname]
+                  for argname, rpcname in self.methodspec[cmd].items()
+                    if argname in kwargs}
+      if cmd in self.addkwargs:
+        params.update(kwargs)
+      return self.command(cmd, **params)
+    argstr = '\n'.join(map(': '.join, sorted(self.methodspec[cmd].items())))
+    if cmd in self.addkwargs:
+      argstr += '\n**kwargs: Additional unlisted parameters allowed.'
+    func.__doc__ = "Method: %s\n -- Valid Keywords --\n%s" % (cmd, argstr)
+    return func
+
   def loadcmds(self):
     for cmd in self.command('list-all-rpc')['commands']:
       method = cmd.replace('-', '_')
       if hasattr(self, method):
         continue
-      if cmd in self.methodspec:
-        def func(self, cmd = cmd, **kwargs):
-          params = {rpcname: kwargs[argname]
-                      for argname, rpcname in self.methodspec[cmd].items()
-                        if argname in kwargs}
-          if cmd in self.addkwargs:
-            params.update(kwargs)
-          return self.command(cmd, **params)
-        argstr = '\n'.join(map(': '.join, sorted(self.methodspec[cmd].items())))
-        if cmd in self.addkwargs:
-          argstr += '\n**kwargs: Additional unlisted parameters allowed.'
-        func.__doc__ = "Method: %s\n -- Valid Keywords --\n%s" % (cmd, argstr)
-      else:
-        def func(self, cmd = cmd):
-          return self.command(cmd)
-        func.__doc__ = "Method: %s\n -- No Additional Keywords --" % cmd
+      genfunc = self._genkwargs if cmd in self.methodspec else self._gen
+      func = genfunc(cmd)
       func.__name__ = str(method)
       # hyphens aren't valid in python syntax, but they're 
       # accessible via getattr if necessary.
