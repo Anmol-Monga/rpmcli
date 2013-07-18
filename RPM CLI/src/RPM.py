@@ -9,7 +9,10 @@ Created on Jun 10, 2013
 from backend.RPCConnection import RPCConnection
 from code import interact
 from contextlib import closing
+from collections import deque, defaultdict
 import shelve
+from threading import Thread
+from traceback import print_exc, format_exc
 
 class RPM(object):
   """
@@ -38,7 +41,7 @@ class RPM(object):
     'callback-remove': {'callback': 'callback'},
     'device-add': {'path': 'path', 'dtype': 'device-type'},
     'device-alarm': {'did': 'device-id'},
-    'device-error': {'did': 'device-id', 'err': 'error'},
+    'device-error': {'did': 'device-id', 'error': 'error'},
     'device-get': {'did': 'device-id'},
     'device-get-path': {'path': 'path'},
     'device-get-state': {'did': 'device-id'},
@@ -46,15 +49,13 @@ class RPM(object):
     'device-get-user': {'did': 'device-id'},
     'device-modify': {'did': 'device-id'},
     'device-refresh': {'did': 'device-id'},
-    'device-release': {'did': 'device-id'},
     'device-remove': {'did': 'device-id'},
     'device-remove-path': {'path': 'path'},
-    'device-reserve': {'did': 'device-id'},
     'device-set-state': {'did': 'device-id', 'state': 'state'},
     'device-set-status': {'did': 'device-id', 'status': 'status'},
     'device-set-user': {'did': 'device-id', 'user': 'user'},
     'files-get': {'path': 'path'},
-    'folder-create': {'path': 'path', 'name': 'leaf'},
+    'folder-create': {'path': 'path', 'leaf': 'leaf'},
     'job-add': {'path': 'job-path'},
     'job-cancel': {'jid': 'job-id'},
     'job-clear-error': {'jid': 'job-id'},
@@ -64,7 +65,7 @@ class RPM(object):
     'job-get': {'jid': 'job-id'},
     'job-get-error': {'jid': 'job-id'},
     'job-get-path': {'jid': 'job-id'},
-    'job-hold': {'jid': 'job-id', 'state': 'hold'},
+    'job-hold': {'jid': 'job-id', 'hold': 'hold'},
     'job-modify': {'jid': 'job-id'},
     'job-move': {'jid': 'job-id'},
     'job-remove': {'jid': 'job-id'},
@@ -137,6 +138,7 @@ class RPM(object):
   }
   addkwargs = {'action-add',
                'action-modify',
+               'callback-call',
                'device-add',
                'device-modify',
                'job-add',
@@ -150,14 +152,20 @@ class RPM(object):
                'transform-modify',
                'user-modify'}
 
-  def __init__(self, host = 'localhost', port = 9198):
+  def __init__(self, host = 'localhost', port = 9198, key = None):
     self.host = host
     self.port = port
     self.conn = RPCConnection(host, port)
-    self.auth()
+    self.conduit = None
+    self.auth(key)
     self.loadcmds()
 
-  def auth(self):
+  def auth(self, key):
+    if key is not None:
+      self.rpckey = key
+      authorized = self.app_key()
+      if authorized['success']:
+        return authorized
     with closing(shelve.open('constants')) as store:
       mykeystr = '%s-%d-%s' % (self.host, self.port, 'rpckey')
       self.rpckey = store.get(mykeystr, '')
@@ -191,6 +199,7 @@ class RPM(object):
   def loadcmds(self):
     for cmd in self.command('list-all-rpc')['commands']:
       method = cmd.replace('-', '_')
+      # Prevent customized defintions from being overriden.
       if hasattr(self, method):
         continue
       genfunc = self._genkwargs if cmd in self.methodspec else self._gen
@@ -200,6 +209,63 @@ class RPM(object):
       # accessible via getattr if necessary.
       setattr(RPM, cmd, func)
       setattr(RPM, method, func)
+
+  def register(self, callback, func = None):
+    """
+      The first call to this function sets up a secondary connection
+      to the RPM Server to handle async event notifications.
+
+      Events are collected into a deque for fast appends.
+    """
+    if self.conduit is None:
+      self.conduit = RPCConnection(self.host, self.port)
+      self.conduit.comm(dict(command = 'app-key', key = self.rpckey))
+      self.events = deque()
+      self.responses = deque()
+      self.errors = deque()
+      self.callbacks = defaultdict(set)
+      self.receiver(start = True)
+    if callback in self.callbacks:
+      self.callbacks[callback].add(func)
+      return
+    # Accessing here just initializes an empty set.  This prevents
+    # multiple redundant calls from re-sending the callback-add, which
+    # RPM reports an error to because the callback is already defined.
+    if func is not None:
+      self.callbacks[callback].add(func)
+    else:
+      self.callbacks[callback]
+    self.conduit.send(dict(command = 'callback-add', callback = callback))
+
+  def unregister(self, callback, func = None):
+    if func is not None:
+      self.callbacks[callback].discard(func)
+    # don't actually unregister if there are other functions listening
+    # for this event.
+    if self.callbacks[callback]:
+      return
+    self.callbacks.pop(callback)
+    self.conduit.send(dict(command = 'callback-remove', callback = callback))
+
+  def receiver(self, start = False):
+    if start:
+      t = Thread(target = self.receiver, name = 'Event Receiver')
+      t.daemon = True
+      return t.start()
+    while True:
+      data = self.conduit.recv()
+      if 'success' in data:
+        self.responses.append(data)
+      if 'callback' in data:
+        self.events.append(data)
+        callback = data['callback']
+        for handler in list(self.callbacks[callback]):
+          try:
+            handler(data)
+          except:
+            # Don't continue to call faulty handlers.
+            self.callbacks[callback].discard(handler)
+            self.errors.append(format_exc())
 
   def app_key(self):
     return self.command('app-key', key = self.rpckey)
