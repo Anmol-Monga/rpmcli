@@ -23,6 +23,7 @@ class RPM(object):
   methodspec = {
     'action-add': {'atype': 'action-type'},
     'action-device-id': {'aid': 'action-id'},
+    'action-enable': {'aid': 'action-id', 'enable': 'enable'},
     'action-get': {'aid': 'action-id'},
     'action-get-devmode': {'aid': 'action-id'},
     'action-get-queue': {'aid': 'action-id'},
@@ -121,6 +122,7 @@ class RPM(object):
     'spool-set-temp': {'path': 'dir'},
     'spool-unique-path': {'path': 'dir', 'name': 'file'},
     'transform-add': {'ttype': 'transform-type'},
+    'transform-enable': {'tid': 'transform-id', 'enable': 'enable'},
     'transform-get': {'tid': 'transform-id'},
     'transform-list': {'qid': 'queue-id', 'qname': 'queue-name'},
     'transform-list-fields': {'ttype': 'transform-type'},
@@ -184,7 +186,7 @@ class RPM(object):
 
   def _genkwargs(self, cmd):
     def func(self, **kwargs):
-      params = {rpcname: kwargs[argname]
+      params = {rpcname: kwargs.pop(argname)
                   for argname, rpcname in self.methodspec[cmd].items()
                     if argname in kwargs}
       if cmd in self.addkwargs:
