@@ -1,0 +1,69 @@
+THE RPM COMMAND LINE INTERFACE (CLI), ALL RELATED SOURCE CODE, AND ALL 
+DOCUMENTATION ARE PROVIDED AS IS WITH NO WARRANTY, EXPRESS OR IMPLIED.
+
+Starting in RPM Remote Print Manager Version 6.0 a Remote Procedure
+Call (RPC) Interface Mechanism is provided to allow third party
+applications to customize RPM's configuration or behavior, register
+for asynchronous notifications of events (callbacks), or otherwise 
+leverage available functionality.  This Interface is implemented over
+Sockets using JavaScript Object Notation (JSON - http://www.json.org).
+
+The RPM Class provided herein facilitates access to this functionality.  
+It can be used interactively when run directly, or can be imported 
+into other projects.
+
+
+
+  -- Examples Of Interactive Use --
+  
+c:\path\to\python.exe RPM.py
+>>> print r
+<__main__.RPM object at 0x02365410>
+>>> print r.queue_list()
+{u'queues': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 769, 770, 796], u'command': u'queue-list', u'success': True}
+>>> print r.queue_jobs(qid = 770)
+{u'command': u'queue-jobs', u'jobs': [175, 176, 177, 178, 179, 180, 181, 182], u'success': True}
+>>> help(r.queue_jobs)
+Help on method queue_jobs in module __main__:
+
+queue_jobs(self, **kwargs) method of __main__.RPM instance
+    Method: queue-jobs
+     -- Valid Keywords --
+    qid: queue-id
+    qname: queue-name
+>>> dir(r)
+# Prints all available methods for the object.
+
+
+
+  -- Special Considerations --
+  
+Commands take the form of hyphen-separated-words (queue-list,job-modify, 
+job-hold) while Callbacks are in the form of period.separated.words
+(job.add, job.modify, queue.purge).  In JSON hyphen-separated keys are 
+perfectly valid, but in Python they are not valid syntax for directly
+declared object properties, nor are they usable as keyword arguments.
+For this reason, the CLI provides all commands as underscore_separated
+methods attached to the RPM Class.  Each method provides abbreviated
+keyword arguments which are substituted for their corresponding RPC Command
+Fields when called.  In the example above, calling:
+
+  r.queue_jobs(qid = 770)
+  
+Will send the following JSON to the RPM Service:
+
+  {"queue-id": 770, "command": "queue-jobs"}
+  
+The available keyword arguments (and the field name that will be substituted
+when the command is sent to RPM) are both listed as a part of the output
+of help(r.<command>).
+
+Because Python allows for dynamic retrieval of object properties these
+two statements are equivalent:
+
+  r.queue_jobs(qid = 770)
+  getattr(r, 'queue-jobs')(qid = 770)
+
+While this is invalid syntax:
+
+  r.queue-jobs(qid = 770)
