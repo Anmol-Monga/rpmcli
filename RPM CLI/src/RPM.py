@@ -11,10 +11,12 @@ from code import interact
 from contextlib import closing
 from collections import deque, defaultdict
 import shelve
-from threading import Thread
-from traceback import print_exc, format_exc
+from threading import Thread, Lock
+from traceback import format_exc
+import sys
 
 class RPM(object):
+  L = Lock()
   """
     The RPM Class encapsulates an RPC Connection to a server
     running RPM Remote Print Manager.
@@ -57,7 +59,7 @@ class RPM(object):
     'device-set-user': {'did': 'device-id', 'user': 'user'},
     'files-get': {'path': 'path'},
     'folder-create': {'path': 'path', 'leaf': 'leaf'},
-    'job-add': {'path': 'job-path'},
+    'job-add': {'qid': 'queue-id', 'path': 'job-path'},
     'job-cancel': {'jid': 'job-id'},
     'job-clear-error': {'jid': 'job-id'},
     'job-copy': {'jid': 'job-id'},
@@ -87,10 +89,10 @@ class RPM(object):
     'queue-get': {'qid': 'queue-id', 'qname': 'queue-name'},
     'queue-hold': {'qid': 'queue-id', 'state': 'hold'},
     'queue-id': {'qname': 'queue-name'},
-    'queue-is -archiving': {'qid': 'queue-id'},
-    'queue-is -enabled': {'qid': 'queue-id', 'qname': 'queue-name'},
-    'queue-is -held': {'qid': 'queue-id', 'qname': 'queue-name'},
-    'queue-is -suspended': {'qid': 'queue-id', 'qname': 'queue-name'},
+    'queue-is-archiving': {'qid': 'queue-id'},
+    'queue-is-enabled': {'qid': 'queue-id', 'qname': 'queue-name'},
+    'queue-is-held': {'qid': 'queue-id', 'qname': 'queue-name'},
+    'queue-is-suspended': {'qid': 'queue-id', 'qname': 'queue-name'},
     'queue-jobs': {'qid': 'queue-id', 'qname': 'queue-name'},
     'queue-modify': {'qid': 'queue-id', 'qname': 'queue-name'},
     'queue-name': {'qid': 'queue-id'},
@@ -207,7 +209,7 @@ class RPM(object):
       genfunc = self._genkwargs if cmd in self.methodspec else self._gen
       func = genfunc(cmd)
       func.__name__ = str(method)
-      # hyphens aren't valid in python syntax, but they're 
+      # hyphens aren't valid in python syntax, but they're
       # accessible via getattr if necessary.
       setattr(RPM, cmd, func)
       setattr(RPM, method, func)
@@ -256,6 +258,8 @@ class RPM(object):
       return t.start()
     while True:
       data = self.conduit.recv()
+      if not hasattr(sys, 'frozen'):
+        print data
       if 'success' in data:
         self.responses.append(data)
       if 'callback' in data:
@@ -273,7 +277,8 @@ class RPM(object):
     return self.command('app-key', key = self.rpckey)
 
   def command(self, cmd, **kwargs):
-    return self.conn.comm(dict(command = cmd, **kwargs))
+    with self.L:
+      return self.conn.comm(dict(command = cmd, **kwargs))
 
 if __name__ == '__main__':
   r = RPM()
