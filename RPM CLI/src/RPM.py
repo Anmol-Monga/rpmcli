@@ -156,11 +156,16 @@ class RPM(object):
                'transform-modify',
                'user-modify'}
 
-  def __init__(self, host = 'localhost', port = 9198, key = None):
+  def __init__(self,
+               host = 'localhost',
+               port = 9198,
+               key = None,
+               closehandler = None):
     self.host = host
     self.port = port
     self.conn = RPCConnection(host, port)
     self.conduit = None
+    self.closehandler = closehandler
     self.auth(key)
     self.loadcmds()
 
@@ -257,13 +262,16 @@ class RPM(object):
       t.daemon = True
       return t.start()
     while True:
-      data = self.conduit.recv()
-      if not hasattr(sys, 'frozen'):
-        print data
-      if 'success' in data:
-        self.responses.append(data)
+      try:
+        data = self.conduit.recv()
+      except EOFError:
+        if self.closehandler is not None:
+          self.closehandler()
+        break
+#       if 'success' in data:
+#         self.responses.append(data)
       if 'callback' in data:
-        self.events.append(data)
+#         self.events.append(data)
         callback = data['callback']
         for handler in list(self.callbacks[callback]):
           try:
@@ -271,7 +279,7 @@ class RPM(object):
           except:
             # Don't continue to call faulty handlers.
             self.callbacks[callback].discard(handler)
-            self.errors.append(format_exc())
+#             self.errors.append(format_exc())
 
   def app_key(self):
     return self.command('app-key', key = self.rpckey)
