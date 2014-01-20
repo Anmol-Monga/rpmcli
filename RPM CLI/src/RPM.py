@@ -270,6 +270,9 @@ class RPM(object):
         break
 #       if 'success' in data:
 #         self.responses.append(data)
+      if not isinstance(data, dict):
+        print "Errant JSON String -", data
+        continue
       if 'callback' in data:
 #         self.events.append(data)
         callback = data['callback']
