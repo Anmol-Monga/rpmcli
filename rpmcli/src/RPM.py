@@ -164,11 +164,25 @@ class RPM(object):
                closehandler = None):
     self.host = host
     self.port = port
-    self.conn = RPCConnection(host, port)
+    self.key = key
+    self.conn = None
+    self._bgconnect(True)
+#     self.conn.debuglevel = 1
     self.conduit = None
     self.closehandler = closehandler
-    self.auth(key)
-    self.loadcmds()
+
+  def _bgconnect(self, start = False):
+    if start:
+      t = Thread(target = self._bgconnect)
+      t.daemon = True
+      return t.start()
+    while True:
+      try:
+        self.conn = RPCConnection()
+        self.auth(self.key)
+        return self.loadcmds()
+      except:
+        pass
 
   def auth(self, key):
     if key is not None:
