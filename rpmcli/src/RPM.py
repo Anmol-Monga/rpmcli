@@ -217,7 +217,7 @@ class RPM(object):
     argstr = '\n'.join(map(': '.join, sorted(self.methodspec[cmd].items())))
     if cmd in self.addkwargs:
       argstr += '\n**kwargs: Additional unlisted parameters allowed.'
-    func.__doc__ = "Method: %s\n -- Valid Keywords --\n%s" % (cmd, argstr)
+    func.__doc__ = "Method: %s\n -- Keyword Mappings --\n%s" % (cmd, argstr)
     return func
 
   def loadcmds(self):
