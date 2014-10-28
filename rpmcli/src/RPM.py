@@ -6,14 +6,15 @@ Created on Jun 10, 2013
 
 @author: daniel
 '''
-from backend.RPCConnection import RPCConnection
 from code import interact
-from contextlib import closing
 from collections import deque, defaultdict
+from contextlib import closing
 import shelve
 from threading import Thread, Lock
-from traceback import format_exc
-import sys
+from time import sleep
+
+from backend.RPCConnection import RPCConnection
+
 
 class RPM(object):
   L = Lock()
