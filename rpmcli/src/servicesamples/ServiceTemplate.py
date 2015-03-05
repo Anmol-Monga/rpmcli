@@ -14,12 +14,12 @@ class Launcher(win32serviceutil.ServiceFramework):
 
   def __init__(self, args):
     win32serviceutil.ServiceFramework.__init__(self, args)
-
     self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
 
   def SvcStop(self):
     sys.stopservice = True
 
   def SvcDoRun(self):
-    # Call a Main() like function here.
+    # Call a Main() like function here, ideally something that will
+    # know to close when the `sys` module gains a 'stopservice' attribute.
     pass
