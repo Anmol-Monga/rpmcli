@@ -166,6 +166,7 @@ class RPM(object):
     self.port = port
     self.key = key
     self.conn = None
+    self.connected = False
     self._bgconnect(True)
 #     self.conn.debuglevel = 1
     self.conduit = None
@@ -180,7 +181,9 @@ class RPM(object):
       try:
         self.conn = RPCConnection()
         self.auth(self.key)
-        return self.loadcmds()
+        self.loadcmds()
+        self.connected = True
+        break
       except:
         pass
 
@@ -292,12 +295,19 @@ class RPM(object):
 #         self.events.append(data)
         callback = data['callback']
         for handler in list(self.callbacks[callback]):
-          try:
-            handler(data)
-          except:
+          self.safecall(handler, data)
             # Don't continue to call faulty handlers.
-            self.callbacks[callback].discard(handler)
+#             self.callbacks[callback].discard(handler)
 #             self.errors.append(format_exc())
+
+  def safecall(self, handler, data):
+    # This approach allows for registration of "unreliable" Callbacks.
+    for _ in range(5):
+      try:
+        handler(data)
+        break
+      except:
+        sleep(0.1)
 
   def app_key(self):
     return self.command('app-key', key = self.rpckey)
