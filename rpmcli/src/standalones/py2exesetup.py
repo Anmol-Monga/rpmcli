@@ -5,6 +5,7 @@ from distutils.core import setup
 import py2exe  # @UnusedImport
 import sys
 from platform import architecture
+from glob import glob
 
 if 'py2exe' not in sys.argv:
   sys.argv.append('py2exe')
@@ -21,6 +22,6 @@ options = {"py2exe": {
 
 if __name__ == '__main__':
   setup(
-    console = ['queuesuspend.py', 'resetsequence.py', 'jobadd.py'],
+    console = set(glob('*.py')) - {'__init__.py', 'py2exesetup.py'},
     zipfile = 'library.bin',
     options = options)
