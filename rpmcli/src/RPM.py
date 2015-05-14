@@ -17,7 +17,6 @@ from backend.RPCConnection import RPCConnection
 
 
 class RPM(object):
-  L = Lock()
   """
     The RPM Class encapsulates an RPC Connection to a server
     running RPM Remote Print Manager.
@@ -60,7 +59,7 @@ class RPM(object):
     'device-set-user': {'did': 'device-id', 'user': 'user'},
     'files-get': {'path': 'path'},
     'folder-create': {'path': 'path', 'leaf': 'leaf'},
-    'job-add': {'qid': 'queue-id', 'path': 'job-path'},
+    'job-add': {'qid': 'queue-id', 'qname': 'queue-name', 'path': 'job-path'},
     'job-cancel': {'jid': 'job-id'},
     'job-clear-error': {'jid': 'job-id'},
     'job-copy': {'jid': 'job-id'},
@@ -166,12 +165,13 @@ class RPM(object):
     self.port = port
     self.key = key
     self.conn = None
-    self.connected = False
+    self.ready = False
     self._bgconnect(True)
-#     self.conn.debuglevel = 1
     self.conduit = None
     self.closehandler = closehandler
-
+    self.L = Lock()
+    self.logfunc = None
+    
   def _bgconnect(self, start = False):
     if start:
       t = Thread(target = self._bgconnect)
@@ -181,9 +181,7 @@ class RPM(object):
       try:
         self.conn = RPCConnection()
         self.auth(self.key)
-        self.loadcmds()
-        self.connected = True
-        break
+        return self.loadcmds()
       except:
         pass
 
@@ -236,7 +234,8 @@ class RPM(object):
       # accessible via getattr if necessary.
       setattr(RPM, cmd, func)
       setattr(RPM, method, func)
-
+    self.ready = True
+    
   def register(self, callback, func = None):
     """
       The first call to this function sets up a secondary connection
@@ -305,16 +304,25 @@ class RPM(object):
     for _ in range(5):
       try:
         handler(data)
-        break
       except:
         sleep(0.1)
+        continue
+      break
+    else:
+      print "Unable to successfully call %s" % handler.__name__
 
   def app_key(self):
     return self.command('app-key', key = self.rpckey)
 
+  def setlogfunc(self, func):
+    self.logfunc = func
+
   def command(self, cmd, **kwargs):
     with self.L:
-      return self.conn.comm(dict(command = cmd, **kwargs))
+      sending = dict(command=cmd, **kwargs)
+      if self.logfunc is not None:
+        self.logfunc('Sending - %s' % sending)
+      return self.conn.comm(sending)
 
 if __name__ == '__main__':
   r = RPM()
